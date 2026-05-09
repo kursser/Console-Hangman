@@ -1,23 +1,24 @@
 import ui_text
 
-
 class UIText:
 
-    @staticmethod
-    def get_title():
-        return ui_text.title
+    def __init__(self):
+        self.texts = ui_text
 
 
-    @staticmethod
-    def get_instruction():
-        return ui_text.instruction
+    def get_title(sefl):
+        return sefl.texts.title
 
 
-    @staticmethod
-    def get_difficulty_selection():
-        return ui_text.difficulty_selection
+    def get_instruction(self):
+        return self.texts.instruction
 
 
-    @staticmethod
-    def get_menu():
-        return ui_text.main_menu
+
+    def get_difficulty_selection(self):
+        return self.texts.difficulty_selection
+
+
+
+    def get_menu(self):
+        return self.texts.main_menu
