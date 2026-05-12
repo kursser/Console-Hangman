@@ -1,253 +1,255 @@
-from time import sleep
+from writing import write
 from random import choice
 import json
-from hangman_art import HangmanRender
+from ui.get_hangman import get_hangman
+from ui import ui_text
+import sys
 
 
-RUSSIAN_ALPHABET = ["а","б","в","г","д","е","ё","ж","з","и","й","к","л","м","н","о","п","р","с","т","у","ф","х","ц","ч","ш","щ","ъ","ы","ь","э","ю","я"]
-with open('words.json', 'r', encoding='utf-8') as dict_words:
-    WORDS = json.load(dict_words)
+
+class HangmanGame():
+
+    _ALPHABET = ["а", "б", "в", "г", "д", "е", "ё", "ж", "з", "и", "й", "к", "л", "м", "н", "о", "п", "р", "с", "т", "у",
+                "ф", "х", "ц", "ч", "ш", "щ", "ъ", "ы", "ь", "э", "ю", "я"]
 
 
-def write(text):
-    for i in text:
-        print(i, end="", flush=True)
-        sleep(0.03)
-    print()
+    def __init__(self):
+        self._all_words = self._load_words()
+        self._attempts = None
+        self._category = self._pick_category()
+        self._word = self._pick_word()
+        self._word_completion = ["_"] * len(self._word)  # строка, содержащая символы _ на каждую букву задуманного слова
+        self._guessed_letters = [] # список уже названных букв
+        self._guessed_words = [] # список уже названных слов
+        self._cnt_attempts = 1 # cчётчик попыток
+        self._hangman = None
+        self._draw_hangman = None
 
 
-def slow_write(text):
-    for i in text:
-        print(i, end="", flush=True)
-        sleep(0.2)
-    print()
+
+    def _load_words(self):
+        with open('../words.json', 'r', encoding='utf-8') as dict_words:
+            return json.load(dict_words)
 
 
-def title():
-    title = f"""   
-    {'█' * 50}
-    █{' ' * 48}█
-    █{' ' * 15}ИГРА «ВИСЕЛИЦА»{' ' * 18}█
-    █{' ' * 15}GAME «HANDMAN»{' ' * 19}█
-    █{' ' * 48}█
-    {'█' * 50}  
-    """
-    print(title)
+    def _pick_category(self):
+        category = choice(list(self._all_words))
+        return category
 
 
-def instructions():
-
-    welcome = f"""
-   
-    {'-' * 50}  
-    📜 ИНСТРУКЦИЯ:
-    • Случайным образом выбирается категория и слово из этой категории
-    • Вводите русские буквы по одной
-    • Можно угадать всё слово целиком, но если слово окажется неверным, то это считается как ошибка
-    • Осторожно: каждая ошибка приближает поражение!
-    • Цель: спасти человечка, угадав слово
-    {'-' * 50}
-    🎪 Удачи в игре!
-    """
-
-    write(welcome)
-    input("Нажмите ENTER чтобы вернуться в меню...")
+    def _pick_word(self):
+        return choice(self._all_words[self._category])
 
 
-def exit_the_game():
-    pass
+    def _update_data(self):
+        self._category = self._pick_category()
+        self._word = self._pick_word()
+        self._word_completion = ["_"] * len(self._word)
+        self._cnt_attempts = 1
+        self._guessed_letters = []
+        self._guessed_words = []
 
 
-def difficulty_selection():
-    difficulty = f"""
-    1. ✅ Лёгкий (10 попыток)
-    2. ⚠️ Средний (6 попыток) 
-    3. 👺 Сложный (3 попытки)
-    """
-    difficulty_dict = {"1": 10, "2": 6, "3": 3}
-
-    while True:
-
-        print(difficulty)
-        choice = input("Выберите уровень сложности: ")
-
-        if choice in ("1", "2", "3"):
-            return difficulty_dict[choice]
-
-        else:
-            write("Неверная операция!! Повторите попытку")
-            continue
 
 
-def random_word(WORDS):
+    @staticmethod
+    def _validate_selection_in_menu(selection):
 
-    random_cathegory = choice(list(WORDS))
+        if selection not in ('1', '2', '3'):
+            raise ValueError('Неверная операция, повторите попытку')
 
-    random_item = choice(WORDS[random_cathegory])
+        elif selection == '1':
+            return 'play'
 
-    return random_item, random_cathegory
+        elif selection == '2':
+            return 'instruction'
 
-
-def choice_draw_hangman(index):
-    '''функция, которая возвращает список рисунков виселицы для выбранной сложности'''
-    render = HangmanRender()
-    art_hangmans = {3: render.get_three_attempts, 6: render.get_six_attempts, 10: render.get_ten_attempts}
-    return art_hangmans[index]()
+        elif selection == '3':
+            return 'exit'
 
 
-def game_again():
-    write("Желаете ли вы продолжить игру?")
-    write("Напишите 'YES' или 'Y' или 'ДА' или 'Д', если желаете продолжить игру")
-    write("Напишите 'NO' или 'N' или 'НЕТ' или 'Н', если желаете вернуться в меню")
-    while True:
-        say = input().lower()
-        if say in ("yes", "y", "да", "д"):
+    def _difficulty_selection(self, selection):
+        if selection not in ('1', '2', '3'):
+            raise ValueError('Неверная операция, повторите попытку')
+
+        elif selection == '1':
+            self._attempts = 10
+
+        elif selection == '2':
+            self._attempts = 6
+
+        elif selection == '3':
+            self._attempts = 3
+
+
+    @staticmethod
+    def _play_again(answer):
+        answer = answer.lower()
+        if answer not in ('y', 'yes', 'да', 'д', 'no', 'n', 'нет', 'н'):
+            raise ValueError('Некорректная команда')
+
+        elif answer in ('y', 'yes', 'да', 'д'):
             return True
 
-        elif say in ("no", "n", "нет", "н"):
+        elif answer in ('no', 'n', 'нет', 'н'):
             return False
 
-        else:
-            write("Некорректная команда!!")
-            write(
-                "Введите 'YES' или 'Y' или 'ДА' или 'Д', если желаете продолжить игру"
-            )
-            write(
-                "Введите 'NO' или 'N' или 'НЕТ' или 'Н', если желаете вернуться в меню"
-            )
-            continue
+    def _guess_letter(self, letter):
+        if letter in self._guessed_letters:
+            raise ValueError('Вы уже использовали такую букву')
+
+        elif letter not in self._ALPHABET:
+            raise ValueError('Некорректный ввод!!! Повторите попытку')
+
+        elif letter in self._word:
+            self._guessed_letters.append(letter)
+            for index, i in enumerate(self._word):
+                if letter == i:
+                    self._word_completion[index] = i.upper()
+            return 'correct'
 
 
-def main_game():
+        elif letter not in self._word:
+            self._guessed_letters.append(letter)
+            self._cnt_attempts += 1
+            return 'wrong'
 
-    word, category = random_word(WORDS)
-    word_completion = [
-        "_" for _ in range(len(word))
-    ]  # строка, содержащая символы _ на каждую букву задуманного слова
-    guessed_letters = []  # список уже названных букв
-    guessed_words = []  # список уже названных слов
-    cnt_tries = 1  # попытки
-    all_tries = difficulty_selection()
-    draw_hangman = choice_draw_hangman(all_tries)
 
-    while cnt_tries <= all_tries + 1:
+    def _guess_word(self, g_word):
+        # YA tyt dumayu
+        if g_word in self._guessed_words:
+            raise ValueError('Вы уже пытались использовать такое слово')
 
-        if "_" not in word_completion:
-            write("Поздравляю! Вы выиграли!")
-            break
+        elif len(g_word) != len(self._word):
+            raise ValueError('Некорректный ввод. Загаданное слово должно быть длиннее. Повторите попытку!!')
 
-        chel = draw_hangman[cnt_tries - 1]
-        print(chel)
 
-        if cnt_tries == all_tries + 1:
-            slow_write("Ты... Проиграл..")
-            slow_write("Прости... Ты мне правда нравился")
-            write(f"Загаданное слово было: {word.upper()}")
-            print()
-            break
+        elif len(g_word) == len(self._word):
+            if g_word != self._word and all(map(lambda x: x in self._ALPHABET, g_word)):
+                self._guessed_words.append(g_word)
+                self._cnt_attempts += 1
+                return 'wrong'
 
-        print("Посмотрите наверх, это вы!!!")
-        print()
-        print(f"\t| Категория {category.capitalize()} |")
-
-        print(
-            cnt_tries,
-            f"                <== это номер вашей попытки (максимум {all_tries})",
-        )
-        print(
-            *word_completion,
-            f"        <== это загаданное слово из {len(word_completion)} букв",
-        )
-        print(guessed_letters, "               <== список уже названных букв")
-        print(guessed_words, "               <== список уже названных слов")
-
-        write("Введите букву: ")
-
-        letter = input().lower()
-
-        if letter == "ё":
-            letter = "e"
-
-        if len(letter) == len(word):
-
-            if letter != word and all(map(lambda x: x in RUSSIAN_ALPHABET, letter)):
-                write("Вы не угадали, это не загаданное слово!!")
-                guessed_words.append(letter)
-                cnt_tries += 1
-
-            elif letter == word:
-                write(f"Поздравляю вы угадали слово {letter.upper()}!!!")
-                break
+            elif g_word == self._word:
+                return 'win'
 
             else:
-                write("Некорректный ввод!!! Повторите попытку")
-
-        elif letter in guessed_words:
-            write("Вы уже пытались использовать такое слово: ")
-
-        elif letter in guessed_letters:
-            write("Вы уже писались использовать такую букву: ")
-
-        elif letter not in RUSSIAN_ALPHABET:
-            write("Некорректный ввод!!! Повторите попытку")
-
-        elif len(letter) == 1 and letter not in word:
-            write(f"Неверно!! Такой {letter.upper()} в этом слове нет :( ")
-            guessed_letters.append(letter)
-            cnt_tries += 1
-
-        elif len(letter) == 1 and letter in word:
-            write(f"Вы угадали!! Буква {letter.upper()} есть в загаданном слове!!")
-            guessed_letters.append(letter)
-            for index, i in enumerate(word):
-                if letter == i:
-                    word_completion[index] = i.upper()
+                raise ValueError('Некорректный ввод!!! Повторите попытку')
 
 
-def game_menu():
-    main_menu = f"""
-    1. 🕹️ Играть
-    2. 📜 Инструкция
-    3. 🚪 Выход
-    """
 
-    print(main_menu)
-
-    while True:
-
-        choice = input()
-
-        if choice in ("1", "2", "3"):
-            return choice
-
-        else:
-            write("Неверная операция!! Повторите попытку")
-
-
-def start_game():
-
-    title()
-
-    while True:
-        choice = game_menu()
-        if choice == "1":
+    def _play(self):
             while True:
-                main_game()
-                isagain = game_again()
-                if isagain:
-                    continue
-                else:
+                print(ui_text.difficulty_selection)
+                try:
+                    selection = input()
+                    self._difficulty_selection(selection)
+                    self._hangman = get_hangman(self._attempts)
                     break
+                except ValueError as er:
+                    write(str(er))
+                    continue
 
-        elif choice == "2":
-            instructions()
+            while self._cnt_attempts <= self._attempts + 1:
 
-        elif choice == "3":
-            write("Выход из игры...")
-            break
+                self._draw_hangman = self._hangman[self._cnt_attempts - 1]
+
+                print(self._draw_hangman)
+
+                print("Посмотрите наверх, это вы!!!")
+                print()
+                print(f"\t| Категория {self._category.capitalize()} |")
+
+                print(
+                    self._cnt_attempts,
+                    f"                <== это номер вашей попытки (максимум {self._attempts})",
+                )
+                print(
+                    *self._word_completion,
+                    f"        <== это загаданное слово из {len(self._word_completion)} букв",
+                )
+                print(self._guessed_letters, "               <== список уже названных букв")
+                print(self._guessed_words, "               <== список уже названных слов")
+
+                try:
+                    write("Введите букву: ")
+
+                    value = input().lower()
+
+                    if len(value) == 1:
+                        letter = value
+                        state = self._guess_letter(letter)
+                        if state == 'correct':
+                            write(f'Вы угадали!! Буква {letter.upper()} есть в этом слове')
+
+                        elif state == 'wrong':
+                            write(f'Вы не угадали!! Буквы {letter.upper()} нет в этом слов')
+
+                    else:
+                        word = value
+                        state = self._guess_word(word)
+                        if state == 'win':
+                            write("Поздравляю! Вы выиграли!")
+                            return
+
+                        elif state == 'wrong':
+                            write('Вы не угадали, это не загаданное слово!!')
+
+                except ValueError as er:
+                    write(str(er))
+                    continue
+
+                if self._cnt_attempts == self._attempts + 1:
+                    self._is_lost = True
+                    print(self._draw_hangman)
+                    write(ui_text.loose)
+                    write(f"Загаданное слово было: {self._word.upper()}")
+                    return
+
+                elif "_" not in self._word_completion:
+                    write(f"Поздравляю вы выиграли! Зааданное слово {self._word.upper()}")
+                    return
 
 
-start_game()
 
 
-# ДОБАВИТЬ ВОЗМОЖНОСТЬ ВЫБОРА КАТЕГОРИИ
+    def start(self):
+        while True:
+            print(ui_text.title)
+            print(ui_text.main_menu)
+            try:
+                selection = input()
+                selection = self._validate_selection_in_menu(selection)
+            except ValueError as er:
+                write(str(er))
+                continue
+
+
+            if selection == 'play':
+                self._play()
+                while True:
+                    try:
+                        print(ui_text.game_again)
+                        pick = input()
+                        answer = self._play_again(pick)
+                        if answer == True:
+                            self._update_data()
+                            self._play()
+                            continue
+
+                        else:
+                            write('Спасибо за игру, до скорых встреч')
+                            self._update_data()
+                            break
+
+                    except ValueError as er:
+                        write(str(er))
+                        continue
+
+            elif selection == 'instruction':
+                print(ui_text.instruction)
+                input('Нажмите Enter чтобы вернуться в меню')
+
+
+            elif selection == 'exit':
+                sys.exit()
